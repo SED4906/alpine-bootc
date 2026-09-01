@@ -24,8 +24,8 @@ rm -rf /boot/*
 apk add systemd-boot
 cat << "EOF" > /usr/bin/bootctl
 #!/bin/ash
-case $1 in
-install)
+case $1$2$4 in
+install--root--esp-path)
 mkdir -p $3$5/EFI/Boot
 case $(arch) in
 x86_64) cp /usr/lib/systemd/boot/efi/systemd-bootx64.efi $3$5/EFI/Boot/BOOTX64.EFI ;;
@@ -37,7 +37,7 @@ timeout 3
 console-mode max
 EOC
 ;;
-*) echo "Oobily goobily weezer beezers!!" ; exit 1 ;;
+*) echo "This is a stub bootctl." ; exit 1 ;;
 esac
 EOF
 chmod +x /usr/bin/bootctl
