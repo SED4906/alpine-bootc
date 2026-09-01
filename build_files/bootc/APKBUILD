@@ -1,0 +1,54 @@
+# Contributor: SED4906 <sed4906birdie@gmail.com>
+# Maintainer:
+pkgname=bootc
+pkgver=1.16.10
+pkgrel=0
+pkgdesc="Boot and upgrade via container images"
+url="https://github.com/bootc-dev/bootc"
+arch="all"
+license="Apache-2.0"
+depends="blkid dosfstools e2fsprogs findmnt fstrim lsblk mount podman sfdisk skopeo umount util-linux-misc wipefs"
+makedepends="cargo-auditable rust zstd zstd-dev ostree-dev"
+source="https://github.com/bootc-dev/bootc/releases/download/v$pkgver/bootc-$pkgver.tar.zstd
+https://github.com/bootc-dev/bootc/releases/download/v$pkgver/bootc-$pkgver-vendor.tar.zstd"
+options="!check"
+
+unpack() {
+    local u
+    mkdir -p "$srcdir"
+    for u in $source; do
+        local s
+        s="$SRCDEST/$(filename_from_uri $u)"
+        msg "Unpacking $s..."
+        tar -C "$srcdir" --zstd -xf "$s" || return 1
+    done
+    mv "$srcdir/vendor" "$srcdir/bootc-$pkgver"
+}
+
+prepare() {
+    default_prepare
+    sed -i "$srcdir/bootc-$pkgver/vendor/bcvk-qemu/src/qemu.rs" -e 's/VHOST_VSOCK_SET_GUEST_CID: libc::c_ulong/VHOST_VSOCK_SET_GUEST_CID: i32/'
+    rm "$srcdir/bootc-$pkgver/vendor/bcvk-qemu/.cargo-checksum.json"
+    sed -i "$srcdir/bootc-$pkgver/crates/tests-integration/Cargo.toml" -e 's%bcvk-qemu = { git = "https://github.com/bootc-dev/bcvk", rev = "d0433d9efec73836c447ab511a365421dd90da82" }%bcvk-qemu = { path = "../../vendor/bcvk-qemu" }%'
+    sed -i "$srcdir/bootc-$pkgver/crates/lib/src/generator.rs" -e 's/st.f_type == libc::OVERLAYFS_SUPER_MAGIC/st.f_type == libc::OVERLAYFS_SUPER_MAGIC as u64/g' -e 's/st.f_type != libc::OVERLAYFS_SUPER_MAGIC/st.f_type != libc::OVERLAYFS_SUPER_MAGIC as u64/g'
+    sed -i "$srcdir/bootc-$pkgver/crates/lib/src/install.rs" -e 's/st.f_type == libc::MSDOS_SUPER_MAGIC/st.f_type == libc::MSDOS_SUPER_MAGIC as u64/' -e 's/st.f_type == libc::TMPFS_MAGIC/st.f_type == libc::TMPFS_MAGIC as u64/'
+}
+
+build() {
+    cargo build --release -p bootc -p bootc-initramfs-setup
+}
+
+package() {
+    install -D -m 0755 -t "$pkgdir/usr/bin" target/release/bootc
+    install -D -m 0755 target/release/bootc-initramfs-setup "$pkgdir/usr/lib/bootc/initramfs-setup"
+    ln -s sysroot/ostree "$pkgdir/ostree"
+    mkdir -p "$pkgdir/usr/lib/ostree"
+    mkdir -p "$pkgdir/sysroot"
+    echo "[composefs]" >> "$pkgdir/usr/lib/ostree/prepare-root.conf"
+    echo "enabled = false" >> "$pkgdir/usr/lib/ostree/prepare-root.conf"
+}
+
+sha512sums="
+9ede03ec8d24d359a69a2522cf0658eefb4273a2b611558c5d672a235bce49cdadf9c0908fda79c756ccf6e6ef37dff9a758a03e75fdc8a9528120e437cbb522  bootc-1.16.10.tar.zstd
+6f89c84581d9332e2c407995e63ce561b626ed02d3507840b5272d4261277f634f81dd051a4f4c47e19d1f1e8cc90e1281600e9eb5c21523882970020ea14d46  bootc-1.16.10-vendor.tar.zstd
+"
