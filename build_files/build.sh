@@ -41,3 +41,12 @@ EOC
 esac
 EOF
 chmod +x /usr/bin/bootctl
+
+cat << "EOF" > /usr/bin/systemctl
+#!/bin/ash
+case $1$2$3 in
+start--quietbootc-finalize-staged.service) bootc composefs-finalize-staged ;;
+*) echo "This is a stub systemctl." ; exit 1 ;;
+esac
+EOF
+chmod +x /usr/bin/systemctl
