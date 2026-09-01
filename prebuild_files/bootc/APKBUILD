@@ -6,7 +6,7 @@ pkgrel=0
 pkgdesc="Boot and upgrade via container images"
 url="https://github.com/bootc-dev/bootc"
 arch="all"
-license="Apache-2.0"
+license="Apache-2.0 OR MIT"
 depends="blkid dosfstools e2fsprogs findmnt fstrim lsblk mount podman sfdisk skopeo umount util-linux-misc wipefs"
 makedepends="cargo-auditable rust zstd zstd-dev ostree-dev"
 source="https://github.com/bootc-dev/bootc/releases/download/v$pkgver/bootc-$pkgver.tar.zstd
@@ -35,7 +35,7 @@ prepare() {
 }
 
 build() {
-    cargo build --release -p bootc -p bootc-initramfs-setup
+    cargo auditable build --release -p bootc -p bootc-initramfs-setup
 }
 
 package() {
