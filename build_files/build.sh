@@ -4,7 +4,7 @@ set -ouex pipefail
 
 VARIANT=virt
 
-apk add linux-$VARIANT openrc
+apk add linux-$VARIANT openrc mdevd-openrc
 echo '/usr/lib/bootc/initramfs-setup' > /etc/mkinitfs/features.d/bootc.files
 cat << "EOF" > /etc/mkinitfs/features.d/bootc.modules
 kernel/fs/efivarfs
