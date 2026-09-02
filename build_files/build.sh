@@ -2,7 +2,7 @@
 
 set -ouex pipefail
 
-VARIANT=stable
+VARIANT=virt
 
 apk add linux-$VARIANT openrc
 echo '/usr/lib/bootc/initramfs-setup' > /etc/mkinitfs/features.d/bootc.files
