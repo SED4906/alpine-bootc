@@ -8,7 +8,7 @@ url="https://github.com/bootc-dev/bootc"
 arch="all"
 license="Apache-2.0 OR MIT"
 depends="blkid dosfstools e2fsprogs findmnt fstrim lsblk mount podman sfdisk skopeo umount util-linux-misc wipefs"
-makedepends="cargo-auditable rust zstd zstd-dev ostree-dev"
+makedepends="cargo-auditable rust zstd-dev ostree-dev"
 source="https://github.com/bootc-dev/bootc/releases/download/v$pkgver/bootc-$pkgver.tar.zstd
 https://github.com/bootc-dev/bootc/releases/download/v$pkgver/bootc-$pkgver-vendor.tar.zstd"
 options="!check"
@@ -42,10 +42,13 @@ package() {
     install -D -m 0755 -t "$pkgdir/usr/bin" target/release/bootc
     install -D -m 0755 target/release/bootc-initramfs-setup "$pkgdir/usr/lib/bootc/initramfs-setup"
     ln -s sysroot/ostree "$pkgdir/ostree"
+    mkdir -p "$pkgdir/usr/lib/bootc/install"
     mkdir -p "$pkgdir/usr/lib/ostree"
     mkdir -p "$pkgdir/sysroot"
     echo "[composefs]" >> "$pkgdir/usr/lib/ostree/prepare-root.conf"
     echo "enabled = false" >> "$pkgdir/usr/lib/ostree/prepare-root.conf"
+    echo "[install.filesystem.root]" >> "$pkgdir/usr/lib/bootc/install/00-alpine.toml"
+    echo 'type = "ext4"' >> "$pkgdir/usr/lib/bootc/install/00-alpine.toml"
 }
 
 sha512sums="
