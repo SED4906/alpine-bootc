@@ -16,6 +16,8 @@ sed -i /usr/share/mkinitfs/initramfs-init -e 's/"${KOPT_rootflags:-ro}"/"${KOPT_
 sed -i /usr/share/mkinitfs/initramfs-init -e '/"${KOPT_root#ZFS=}" "$sysroot"/a\' -e '/usr/lib/bootc/initramfs-setup setup-root'
 mkinitfs $(ls /lib/modules | tail -1)
 
+rc-update add cgroups
+
 mkdir -p /usr/lib/modules/$(ls /lib/modules | tail -1)
 mv /boot/vmlinuz-$VARIANT /usr/lib/modules/$(ls /lib/modules | tail -1)/vmlinuz
 mv /boot/initramfs-$VARIANT /usr/lib/modules/$(ls /lib/modules | tail -1)/initramfs.img
