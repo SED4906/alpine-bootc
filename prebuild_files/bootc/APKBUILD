@@ -1,57 +1,133 @@
 # Contributor: SED4906 <sed4906birdie@gmail.com>
-# Maintainer:
+# Maintainer: SED4906 <sed4906birdie@gmail.com>
 pkgname=bootc
-pkgver=1.16.10
+pkgver=1.16.11
 pkgrel=0
 pkgdesc="Boot and upgrade via container images"
-url="https://github.com/bootc-dev/bootc"
-arch="all"
+url="https://bootc.dev"
+arch="x86_64 aarch64" # armv7 CI build ran out of memory
 license="Apache-2.0 OR MIT"
 depends="blkid dosfstools e2fsprogs findmnt fstrim lsblk mount podman sfdisk skopeo umount util-linux-misc wipefs"
-makedepends="cargo-auditable rust zstd-dev ostree-dev"
+makedepends="cargo-auditable rust zstd-dev ostree-dev go-md2man libselinux-dev clang-libclang"
 source="https://github.com/bootc-dev/bootc/releases/download/v$pkgver/bootc-$pkgver.tar.zstd
 https://github.com/bootc-dev/bootc/releases/download/v$pkgver/bootc-$pkgver-vendor.tar.zstd"
-options="!check"
+subpackages="
+	$pkgname-base
+	$pkgname-doc
+	$pkgname-misc
+	$pkgname-mkinitfs
+	$pkgname-bash-completion
+	$pkgname-fish-completion
+	$pkgname-zsh-completion
+	"
+options="!check" # test suite needs SELinux
 
 unpack() {
-    local u
-    mkdir -p "$srcdir"
-    for u in $source; do
-        local s
-        s="$SRCDEST/$(filename_from_uri $u)"
-        msg "Unpacking $s..."
-        tar -C "$srcdir" --zstd -xf "$s" || return 1
-    done
-    mv "$srcdir/vendor" "$srcdir/bootc-$pkgver"
+	local u
+	mkdir -p "$srcdir"
+	for u in $source; do
+		local s
+		s="$SRCDEST/$(filename_from_uri $u)"
+		msg "Unpacking $s..."
+		tar -C "$srcdir" --zstd -xf "$s" || return 1
+	done
+	mv "$srcdir"/vendor "$srcdir"/bootc-$pkgver
 }
 
 prepare() {
-    default_prepare
-    sed -i "$srcdir/bootc-$pkgver/vendor/bcvk-qemu/src/qemu.rs" -e 's/VHOST_VSOCK_SET_GUEST_CID: libc::c_ulong/VHOST_VSOCK_SET_GUEST_CID: i32/'
-    rm "$srcdir/bootc-$pkgver/vendor/bcvk-qemu/.cargo-checksum.json"
-    sed -i "$srcdir/bootc-$pkgver/crates/tests-integration/Cargo.toml" -e 's%bcvk-qemu = { git = "https://github.com/bootc-dev/bcvk", rev = "d0433d9efec73836c447ab511a365421dd90da82" }%bcvk-qemu = { path = "../../vendor/bcvk-qemu" }%'
-    sed -i "$srcdir/bootc-$pkgver/crates/lib/src/generator.rs" -e 's/st.f_type == libc::OVERLAYFS_SUPER_MAGIC/st.f_type == libc::OVERLAYFS_SUPER_MAGIC as u64/g' -e 's/st.f_type != libc::OVERLAYFS_SUPER_MAGIC/st.f_type != libc::OVERLAYFS_SUPER_MAGIC as u64/g'
-    sed -i "$srcdir/bootc-$pkgver/crates/lib/src/install.rs" -e 's/st.f_type == libc::MSDOS_SUPER_MAGIC/st.f_type == libc::MSDOS_SUPER_MAGIC as u64/' -e 's/st.f_type == libc::TMPFS_MAGIC/st.f_type == libc::TMPFS_MAGIC as u64/'
+	default_prepare
+	mv .cargo/vendor-config.toml .cargo/config.toml
+	cd crates/lib/src
+	case $CARCH in
+	x86_64|aarch64*) sed -i generator.rs -i install.rs -e 's/libc::.\+_MAGIC/& as u64/g' ;;
+	arm*) sed -i generator.rs -i install.rs -e 's/libc::.\+_MAGIC/& as u32/g' ;;
+	esac
 }
 
 build() {
-    cargo auditable build --release -p bootc -p bootc-initramfs-setup
+	cargo auditable build --release --frozen -p bootc -p bootc-initramfs-setup
+	cargo run --release --frozen -p xtask -- manpages
+	mkdir -p target/completion
+	for shell in bash fish zsh; do
+		target/release/bootc completion $shell > target/completion/bootc.$shell
+	done
 }
 
 package() {
-    install -D -m 0755 -t "$pkgdir/usr/bin" target/release/bootc
-    install -D -m 0755 target/release/bootc-initramfs-setup "$pkgdir/usr/lib/bootc/initramfs-setup"
-    ln -s sysroot/ostree "$pkgdir/ostree"
-    mkdir -p "$pkgdir/usr/lib/bootc/install"
-    mkdir -p "$pkgdir/usr/lib/ostree"
-    mkdir -p "$pkgdir/sysroot"
-    echo "[composefs]" >> "$pkgdir/usr/lib/ostree/prepare-root.conf"
-    echo "enabled = false" >> "$pkgdir/usr/lib/ostree/prepare-root.conf"
-    echo "[install.filesystem.root]" >> "$pkgdir/usr/lib/bootc/install/00-alpine.toml"
-    echo 'type = "ext4"' >> "$pkgdir/usr/lib/bootc/install/00-alpine.toml"
+	install -D -m 0755 -t "$pkgdir"/usr/bin target/release/bootc
+	install -D -m 0755 target/release/bootc-initramfs-setup "$pkgdir"/usr/lib/bootc/initramfs-setup
+	install -D -m 0644 -t "$pkgdir"/usr/share/man/man5 target/man/*.5
+	install -D -m 0644 -t "$pkgdir"/usr/share/man/man8 target/man/*.8
+	install -D -m 0644 target/completion/bootc.bash "$pkgdir"/usr/share/bash-completion/completions/bootc
+	install -D -m 0644 target/completion/bootc.fish "$pkgdir"/usr/share/fish/vendor_completions.d/bootc.fish
+	install -D -m 0644 target/completion/bootc.zsh "$pkgdir"/usr/share/zsh/site-functions/_bootc
+}
+
+base() {
+	depends="$pkgname=$pkgver-r$pkgrel"
+	pkgdesc="Base files for $pkgname"
+
+	mkdir -p "$subpkgdir"/sysroot
+	mkdir -p "$subpkgdir"/usr/lib/bootc/install
+	mkdir -p "$subpkgdir"/usr/lib/ostree
+	ln -s sysroot/ostree "$subpkgdir"/ostree
+	echo '[composefs]' > "$subpkgdir"/usr/lib/ostree/prepare-root.conf
+	echo 'enabled = false' >> "$subpkgdir"/usr/lib/ostree/prepare-root.conf
+	echo '[install.filesystem.root]' > "$subpkgdir"/usr/lib/bootc/install/00-alpine.toml
+	echo 'type = "ext4"' >> "$subpkgdir"/usr/lib/bootc/install/00-alpine.toml
+}
+
+misc() {
+	depends="$pkgname=$pkgver-r$pkgrel"
+	pkgdesc="Miscellaneous files for $pkgname"
+
+	mkdir -p "$subpkgdir"/usr/bin
+	cat <<- "EOF" > "$subpkgdir"/usr/bin/bootctl
+	#!/bin/ash
+	case $1$2$4 in
+	install--root--esp-path)
+	mkdir -p $3$5/EFI/Boot
+	case $(arch) in
+		x86_64) cp /usr/lib/systemd/boot/efi/systemd-bootx64.efi $3$5/EFI/Boot/BOOTX64.EFI ;;
+		arm*) cp /usr/lib/systemd/boot/efi/systemd-bootarm.efi $3$5/EFI/Boot/BOOTARM.EFI ;;
+		aarch64*) cp /usr/lib/systemd/boot/efi/systemd-bootaa64.efi $3$5/EFI/Boot/BOOTAA64.EFI ;;
+		*) echo "Unsupported architecture!" ; exit 1 ;;
+	esac
+	mkdir -p $3$5/loader
+	cat <<- "EOC" > $3$5/loader/loader.conf
+	timeout 3
+	console-mode max
+	EOC
+	;;
+	*) echo "This is a stub bootctl." ; exit 1 ;;
+	esac
+	EOF
+	chmod +x "$subpkgdir"/usr/bin/bootctl
+
+	cat <<- "EOF" > "$subpkgdir"/usr/bin/systemctl
+	#!/bin/ash
+	case $1$2$3 in
+	start--quietbootc-finalize-staged.service) bootc composefs-finalize-staged ;;
+	*) echo "This is a stub systemctl." ; exit 1 ;;
+	esac
+	EOF
+	chmod +x "$subpkgdir"/usr/bin/systemctl
+}
+
+mkinitfs() {
+	depends="$pkgname=$pkgver-r$pkgrel mkinitfs"
+	install_if="$pkgname=$pkgver-r$pkgrel mkinitfs"
+	pkgdesc="$pkgname module for mkinitfs"
+
+	mkdir -p "$subpkgdir"/etc/mkinitfs/features.d
+	echo '/usr/lib/bootc/initramfs-setup' > "$subpkgdir"/etc/mkinitfs/features.d/bootc.files
+	cat <<- "EOF" > "$subpkgdir"/etc/mkinitfs/features.d/bootc.modules
+	kernel/fs/efivarfs
+	kernel/fs/erofs
+	EOF
 }
 
 sha512sums="
-9ede03ec8d24d359a69a2522cf0658eefb4273a2b611558c5d672a235bce49cdadf9c0908fda79c756ccf6e6ef37dff9a758a03e75fdc8a9528120e437cbb522  bootc-1.16.10.tar.zstd
-6f89c84581d9332e2c407995e63ce561b626ed02d3507840b5272d4261277f634f81dd051a4f4c47e19d1f1e8cc90e1281600e9eb5c21523882970020ea14d46  bootc-1.16.10-vendor.tar.zstd
+a775b1dad14c76d1d9a6bd01f27558f78717267aefe75eb333e7a6fc8e1ec00fd46f97cd216201313b436745459408c55bab6707d6a9ec7e002bba0d35aa0a33  bootc-1.16.11.tar.zstd
+64118f8939f5ca428189aec286b445e0b833949700ca7e378794d7c09fd179e4ff15a86184aca345ea32dcc96ddf1848efffa0aa878aa061ddde8f41aabb7bcd  bootc-1.16.11-vendor.tar.zstd
 "

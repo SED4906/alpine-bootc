@@ -9,6 +9,7 @@ abuild-keygen -a -i -n
 cp -r /ctx/bootc /tmp/bootc
 abuild -F -C /tmp/bootc -r -s /tmp/srcdest -P /tmp/repodest
 apk add /tmp/repodest/tmp/$(abuild -A)/bootc-*.apk
+apk del bootc-bash-completion bootc-fish-completion bootc-zsh-completion bootc-doc
 
 . /root/.config/abuild/abuild.conf
 rm /etc/apk/keys/$(basename $PACKAGER_PRIVKEY).pub
