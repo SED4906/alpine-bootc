@@ -20,4 +20,4 @@ RUN --mount=type=bind,from=bctx,source=/,target=/ctx \
 
 LABEL containers.bootc=1
 
-RUN bootc container lint
+RUN PATH=/usr/bin bootc container lint
