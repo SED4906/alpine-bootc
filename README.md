@@ -6,5 +6,5 @@ podman run --rm --privileged --pid=host --ipc=host -v /var/lib/containers:/var/l
 ```
 
 Notes:
-- `build_files/build.sh` specifies linux-virt by default. You might want lts or stable. VARIANT=virt can be changed to something else.
+- `build_files/build.sh` specifies linux-firmware-none.
 - For testing purposes, before I reboot into the installed system, I mount the root partition to `/mnt` and remove the `*` from root's entry in `/mnt/state/deploy/(blah)/etc/shadow` so I can log in without a password.

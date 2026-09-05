@@ -2,20 +2,20 @@
 
 set -ouex pipefail
 
-VARIANT=virt
+FLAVOR=stable
 
-apk add linux-$VARIANT alpine-base
-echo 'features="ata base bootc cdrom ext4 keymap kms mmc nvme raid scsi usb virtio"' > /etc/mkinitfs/mkinitfs.conf
+apk add alpine-base
+rc-update add cgroups
+echo 'features="$features bootc"' >> /etc/mkinitfs/mkinitfs.conf
 sed -i /usr/share/mkinitfs/initramfs-init -e '/ebegin "Mounting root"/a\' -e 'modprobe -a efivarfs erofs ext4 overlay vfat; mount -t efivarfs efivarfs /sys/firmware/efi/efivars; mount -t tmpfs tmpfs /tmp'
 sed -i /usr/share/mkinitfs/initramfs-init -e 's/"${KOPT_rootflags:-ro}"/"${KOPT_rootflags:-rw}"/'
 sed -i /usr/share/mkinitfs/initramfs-init -e '/"${KOPT_root#ZFS=}" "$sysroot"/a\' -e '/usr/lib/bootc/initramfs-setup setup-root'
-mkinitfs $(ls /lib/modules | tail -1)
 
-rc-update add cgroups
-
-mkdir -p /usr/lib/modules/$(ls /lib/modules | tail -1)
-mv /boot/vmlinuz-$VARIANT /usr/lib/modules/$(ls /lib/modules | tail -1)/vmlinuz
-mv /boot/initramfs-$VARIANT /usr/lib/modules/$(ls /lib/modules | tail -1)/initramfs.img
+apk add linux-$FLAVOR linux-firmware-none
+KERNEL=$(ls /lib/modules | tail -1)
+mkdir -p /usr/lib/modules/$KERNEL
+mv /boot/vmlinuz-$FLAVOR /usr/lib/modules/$KERNEL/vmlinuz
+mv /boot/initramfs-$FLAVOR /usr/lib/modules/$KERNEL/initramfs.img
 rm -rf /boot/*
 
 apk add systemd-boot
