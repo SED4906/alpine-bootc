@@ -1,0 +1,10 @@
+#!/sbin/openrc-run
+
+start() {
+    ebegin "Mounting /home"
+	mount --bind /var/home /home
+	eend $? "Failed to mount /home"
+	ebegin "Mounting /root"
+	mount --bind /var/roothome /root
+	eend $? "Failed to mount /root"
+}

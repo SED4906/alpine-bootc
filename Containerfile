@@ -3,6 +3,7 @@ COPY prebuild_files /
 
 FROM scratch as bctx
 COPY build_files /
+COPY system_files /system_files
 
 FROM docker.io/library/alpine:edge
 
