@@ -7,7 +7,7 @@ FLAVOR=stable
 cp -avf "/ctx/system_files"/. /
 mkdir -p /var/home /var/roothome
 
-apk add alpine-base
+apk add alpine-base tzdata
 for s in cgroups varhome hostname networking; do rc-update add $s; done
 echo 'features="$features bootc"' >> /etc/mkinitfs/mkinitfs.conf
 sed -i /usr/share/mkinitfs/initramfs-init -e '/ebegin "Mounting root"/a\' -e 'modprobe -a efivarfs erofs ext4 overlay vfat; mount -t efivarfs efivarfs /sys/firmware/efi/efivars; mount -t tmpfs tmpfs /tmp'
