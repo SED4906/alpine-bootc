@@ -1,7 +1,7 @@
 # Contributor: SED4906 <sed4906birdie@gmail.com>
 # Maintainer: SED4906 <sed4906birdie@gmail.com>
 pkgname=bootc
-pkgver=1.16.11
+pkgver=1.16.13
 pkgrel=0
 pkgdesc="Boot and upgrade via container images"
 url="https://bootc.dev"
@@ -37,16 +37,19 @@ unpack() {
 prepare() {
 	default_prepare
 	mv .cargo/vendor-config.toml .cargo/config.toml
+	echo '[patch.crates-io]' >> .cargo/config.toml
+	echo 'rustix = { path = "vendor/rustix" }' >> .cargo/config.toml
 	cd crates/lib/src
 	case $CARCH in
 	x86_64|aarch64*) sed -i generator.rs -i install.rs -e 's/libc::.\+_MAGIC/& as u64/g' ;;
 	arm*) sed -i generator.rs -i install.rs -e 's/libc::.\+_MAGIC/& as u32/g' ;;
 	esac
+	sed -i ../../../vendor/rustix/src/backend/libc/c.rs -e '477,512d'
 }
 
 build() {
-	cargo auditable build --release --frozen -p bootc -p bootc-initramfs-setup
-	cargo run --release --frozen -p xtask -- manpages
+	cargo auditable build --release --offline -p bootc -p bootc-initramfs-setup
+	cargo run --release --offline -p xtask -- manpages
 	mkdir -p target/completion
 	for shell in bash fish zsh; do
 		target/release/bootc completion $shell > target/completion/bootc.$shell
@@ -128,6 +131,6 @@ mkinitfs() {
 }
 
 sha512sums="
-a775b1dad14c76d1d9a6bd01f27558f78717267aefe75eb333e7a6fc8e1ec00fd46f97cd216201313b436745459408c55bab6707d6a9ec7e002bba0d35aa0a33  bootc-1.16.11.tar.zstd
-64118f8939f5ca428189aec286b445e0b833949700ca7e378794d7c09fd179e4ff15a86184aca345ea32dcc96ddf1848efffa0aa878aa061ddde8f41aabb7bcd  bootc-1.16.11-vendor.tar.zstd
+6f27ab263b360b3623820606497feb622c8dc4421de564db9f3a5d0544994c85da3946ea44bfabe56e1c8cd8ea4b8c8907368d1c0ebcd1746826200f1333a09c  bootc-1.16.13.tar.zstd
+5988fd2453874fd09dadda5a6c25dea96ca158f6554bda76225eea2662f2211da283f0ef21c91fc4b5b7c036b6d35def56a6ccffb21df8f442726ce2e5f687b4  bootc-1.16.13-vendor.tar.zstd
 "
