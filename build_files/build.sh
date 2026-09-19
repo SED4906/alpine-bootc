@@ -7,8 +7,6 @@ FLAVOR=stable
 cp -avf "/ctx/system_files"/. /
 mkdir -p /var/home /var/roothome
 
-echo '@ctx /ctx/packages/testing' >> /etc/apk/repositories
-for p in bootc bootc-base bootc-misc bootc-mkinitfs; do apk add $p@ctx; done
 apk add alpine-base tzdata
 for s in cgroups varhome hostname networking; do rc-update add $s; done
 echo 'features="$features bootc"' >> /etc/mkinitfs/mkinitfs.conf
