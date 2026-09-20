@@ -1,19 +1,10 @@
-FROM scratch as pctx
-COPY prebuild_files /
-
-FROM scratch as bctx
+FROM scratch as ctx
 COPY build_files /
 COPY system_files /system_files
 
 FROM docker.io/library/alpine:edge
 
-RUN --mount=type=bind,from=pctx,source=/,target=/ctx \
-    --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
-    --mount=type=tmpfs,dst=/tmp \
-    /ctx/bootc.sh
-
-RUN --mount=type=bind,from=bctx,source=/,target=/ctx \
+RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     --mount=type=tmpfs,dst=/tmp \
