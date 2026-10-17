@@ -1,16 +1,16 @@
 # Contributor: SED4906 <sed4906birdie@gmail.com>
 # Maintainer: SED4906 <sed4906birdie@gmail.com>
 pkgname=bootc
-pkgver=1.16.13
+pkgver=1.17.1
 pkgrel=0
 pkgdesc="Boot and upgrade via container images"
 url="https://bootc.dev"
 arch="x86_64 aarch64" # armv7 CI build ran out of memory
 license="Apache-2.0 OR MIT"
 depends="blkid dosfstools e2fsprogs findmnt fstrim lsblk mount podman sfdisk skopeo umount util-linux-misc wipefs"
-makedepends="cargo-auditable rust zstd-dev ostree-dev go-md2man libselinux-dev clang-libclang"
-source="https://github.com/bootc-dev/bootc/releases/download/v$pkgver/bootc-$pkgver.tar.zstd
-https://github.com/bootc-dev/bootc/releases/download/v$pkgver/bootc-$pkgver-vendor.tar.zstd"
+makedepends="cargo-auditable rust zstd-dev ostree-dev go-md2man"
+source="bootc-$pkgver.tar.zst::https://github.com/bootc-dev/bootc/releases/download/v$pkgver/bootc-$pkgver.tar.zstd
+	bootc-$pkgver-vendor.tar.zst::https://github.com/bootc-dev/bootc/releases/download/v$pkgver/bootc-$pkgver-vendor.tar.zstd"
 subpackages="
 	$pkgname-base
 	$pkgname-doc
@@ -22,34 +22,20 @@ subpackages="
 	"
 options="!check" # test suite needs SELinux
 
-unpack() {
-	local u
-	mkdir -p "$srcdir"
-	for u in $source; do
-		local s
-		s="$SRCDEST/$(filename_from_uri $u)"
-		msg "Unpacking $s..."
-		tar -C "$srcdir" --zstd -xf "$s" || return 1
-	done
-	mv "$srcdir"/vendor "$srcdir"/bootc-$pkgver
-}
-
 prepare() {
 	default_prepare
+	mv ../vendor vendor
 	mv .cargo/vendor-config.toml .cargo/config.toml
-	echo '[patch.crates-io]' >> .cargo/config.toml
-	echo 'rustix = { path = "vendor/rustix" }' >> .cargo/config.toml
 	cd crates/lib/src
 	case $CARCH in
 	x86_64|aarch64*) sed -i generator.rs -i install.rs -e 's/libc::.\+_MAGIC/& as u64/g' ;;
 	arm*) sed -i generator.rs -i install.rs -e 's/libc::.\+_MAGIC/& as u32/g' ;;
 	esac
-	sed -i ../../../vendor/rustix/src/backend/libc/c.rs -e '477,512d'
 }
 
 build() {
-	cargo auditable build --release --offline -p bootc -p bootc-initramfs-setup
-	cargo run --release --offline -p xtask -- manpages
+	PCRE2_SYS_STATIC=0 cargo auditable build --no-default-features --features "install-to-disk" --release --offline -p bootc -p bootc-initramfs-setup
+	PCRE2_SYS_STATIC=0 cargo run --release --offline -p xtask -- manpages -- --no-default-features --features "install-to-disk"
 	mkdir -p target/completion
 	for shell in bash fish zsh; do
 		target/release/bootc completion $shell > target/completion/bootc.$shell
@@ -59,8 +45,9 @@ build() {
 package() {
 	install -D -m 0755 -t "$pkgdir"/usr/bin target/release/bootc
 	install -D -m 0755 target/release/bootc-initramfs-setup "$pkgdir"/usr/lib/bootc/initramfs-setup
-	install -D -m 0644 -t "$pkgdir"/usr/share/man/man5 target/man/*.5
-	install -D -m 0644 -t "$pkgdir"/usr/share/man/man8 target/man/*.8
+	for section in 5 7 8; do
+		install -D -m 0644 -t "$pkgdir"/usr/share/man/man$section target/man/*.$section
+	done
 	install -D -m 0644 target/completion/bootc.bash "$pkgdir"/usr/share/bash-completion/completions/bootc
 	install -D -m 0644 target/completion/bootc.fish "$pkgdir"/usr/share/fish/vendor_completions.d/bootc.fish
 	install -D -m 0644 target/completion/bootc.zsh "$pkgdir"/usr/share/zsh/site-functions/_bootc
@@ -71,11 +58,9 @@ base() {
 	pkgdesc="Base files for $pkgname"
 
 	mkdir -p "$subpkgdir"/sysroot
+	mkdir -p "$subpkgdir"/usr/lib/composefs
+	touch "$subpkgdir"/usr/lib/composefs/setup-root-conf.toml
 	mkdir -p "$subpkgdir"/usr/lib/bootc/install
-	mkdir -p "$subpkgdir"/usr/lib/ostree
-	ln -s sysroot/ostree "$subpkgdir"/ostree
-	echo '[composefs]' > "$subpkgdir"/usr/lib/ostree/prepare-root.conf
-	echo 'enabled = false' >> "$subpkgdir"/usr/lib/ostree/prepare-root.conf
 	echo '[install.filesystem.root]' > "$subpkgdir"/usr/lib/bootc/install/00-alpine.toml
 	echo 'type = "ext4"' >> "$subpkgdir"/usr/lib/bootc/install/00-alpine.toml
 }
@@ -131,6 +116,6 @@ mkinitfs() {
 }
 
 sha512sums="
-6f27ab263b360b3623820606497feb622c8dc4421de564db9f3a5d0544994c85da3946ea44bfabe56e1c8cd8ea4b8c8907368d1c0ebcd1746826200f1333a09c  bootc-1.16.13.tar.zstd
-5988fd2453874fd09dadda5a6c25dea96ca158f6554bda76225eea2662f2211da283f0ef21c91fc4b5b7c036b6d35def56a6ccffb21df8f442726ce2e5f687b4  bootc-1.16.13-vendor.tar.zstd
+691daec0192e6d9eac3239268d971460f02036ba85184861c1f2d197931049bc3e96c4fb88a619fdc441928bbf3ca4f993db36ff53cc408a7a6221d89e90145b  bootc-1.17.1.tar.zst
+79616da598d3c6972674deae3aa5b05b2c50dc792d72b4f3a025c6508ee9f3c4362301bbfa6bac5f39d5ecc50843c0ac53be9c0531648a79903084c119e3cb7f  bootc-1.17.1-vendor.tar.zst
 "
